@@ -1,0 +1,237 @@
+#!/bin/bash
+
+echo ""
+SCRIPTNAME=$(basename $0)
+HELP="Need help?  Try $SCRIPTNAME -h"
+
+# what to do if the user makes a mistake
+UERROR () {
+echo "================================================================"
+echo -e "$1\n$HELP"
+echo "================================================================"
+echo ""
+exit 1
+} 
+
+# defaults
+OVERWRITE="NO"
+PSANA="YES"
+CALIBFILE="None"
+[ $CHEETAH ] || CHEETAH="cheetah"
+[ $H5DIR ] || H5DIR="."
+[ $XTCDIR ] || XTCDIR="."
+[ $CONFIGDIR ] || CONFIGDIR="."
+[ $PSANA_CONFIG ] || PSANA_CONFIG="psana.cfg"
+
+# Make sure directories end with /. It's necessary for find to work
+H5DIR=${H5DIR}/
+XTCDIR=${XTCDIR}/
+CONFIGDIR=${CONFIGDIR}/
+EXPT=${expt}
+
+printenv PYTHONPATH
+
+# get options:
+while getopts "r:i:t:s:n:j:c:qdoOhpmf" OPTION; do
+	case $OPTION in
+	r) if [ $OPTARG -eq $OPTARG 2> /dev/null ]; then
+			RUNDIR=$(printf 'r%04d' $OPTARG)
+			RUNNUMBER=$(printf '%d' $OPTARG)
+		else
+			UERROR "Specify a numerical value for the run number"
+		fi;;	
+	i) INIFILE=$OPTARG;;
+	t) TAG=$OPTARG;;
+	q) QUE="YES";;
+	s) ARGS="$ARGS -s $OPTARG";;
+	n) ARGS="$ARGS -n $OPTARG";;
+	j) NTHREADS=$OPTARG;;
+	c) CALIBFILE=$OPTARG;;
+	o) OVERWRITE="CHECK";;
+	O) OVERWRITE="FORCE";;
+	h) SHOWHELP="YES";;
+	p) PSANA="YES";;
+	f) HDF5="YES";;
+	m) MYANA="YES"
+	   PSANA="";;
+	?) UERROR "Unrecognized option $OPTARG";;
+	esac
+done
+
+if [ $SHOWHELP ]; then
+cat << EOF
+This is hitfinder, a handy (or just plain confusing?) bash script wrapper for
+Anton Barty's cheetah program
+EOF
+exit 0
+fi
+
+# sanity checks
+[ -d $H5DIR ]   || UERROR "The hdf5 file path $H5DIR does not exist"
+[ -d $XTCDIR ]  || UERROR "The xtc file path $XTCDIR does not exist"
+hash $CHEETAH 2>&- || UERROR "$CHEETAH is not executable"
+[ $RUNDIR ]     || UERROR "You did not specify a run number"
+[ $(find $XTCDIR/${RUNDIR}  -maxdepth 1 -name "*AGIPD01*.h5" | wc -l | awk '{print $1}') -gt 0 ] || \
+	UERROR "There are no files named *AGIPD01*.h5 in $XTCDIR"
+echo "This is run number $RUNNUMBER"
+
+
+# set the save directory if not specified
+SAVEDIR=$H5DIR/$RUNDIR
+[ $TAG ] && SAVEDIR=$SAVEDIR-$TAG
+
+# if the save directory exists, make sure we can write files as needed
+if [ -d $SAVEDIR ]; then
+[ -w $SAVEDIR ]   || UERROR "You don't have write permissions in the directory $SAVEDIR"
+fi
+
+#
+# Parsing of INIFILE
+#
+INIFILE_FULL=$INIFILE
+if [ ! -f $INIFILE ]; then
+  # full path to ini file not specified?  look for it:
+  echo "Searching for an ini file named $INIFILE"
+  INIFILE_FULL=$(cd $CONFIGDIR ; find $CONFIGDIR -name $INIFILE)
+
+  # check if multiple files found
+  if [ "$(echo $INIFILE_FULL | grep -o ' ' | wc -l)" -gt 0 ]; then
+	echo "Found too many files:"
+	echo -e "$(echo $INIFILE | sed 's/ /\n/g')\n"
+	exit 1
+  fi
+fi
+
+# any luck finding the ini file?
+[ $INIFILE_FULL ] || UERROR "Can't find the right ini file"
+[ -f $INIFILE_FULL ] || UERROR "Can't find the ini file $INIFILE_FULL"
+INIFILE_FULL=$(readlink -f $INIFILE_FULL)
+echo "Using this ini file: $INIFILE_FULL"
+
+# 
+# Similar but brifer parsing of CALIBFILE
+#
+CALIBFILE_FULL=$CALIBFILE
+if [ $CALIBFILE != "None" ]; then
+  if [ ! -f $CALIBFILE ]; then
+    echo "Searching for a calibration file named $CALIBFILE"
+    CALIBFILE_FULL=$(cd $CONFIGDIR ; find $CONFIGDIR -name $CALIBFILE)
+
+    # check if multiple files found
+    if [ "$(echo $CALIBFILE_FULL | grep -o ' ' | wc -l)" -gt 0 ]; then
+	echo "Found too many files:"
+	echo -e "$(echo $CALIBFILE | sed 's/ /\n/g')\n"
+	exit 1
+    fi
+
+  fi
+fi
+
+
+# output from cheetah will go here
+LOGFILE=$SAVEDIR/bsub.log
+
+# let me know what's about to happen
+echo "Will search for xtc data here: $XTCDIR"
+echo "Will save hdf5 data here: $SAVEDIR"
+
+# Make it group friendly
+umask 002
+
+# Create directory for this data set
+if [ ! -d $SAVEDIR ]; then
+
+	echo "Creating hdf5 data directory"
+	mkdir $SAVEDIR
+	echo "Moving to hdf5 data directory"
+	cd $SAVEDIR
+
+else
+
+	if [ "$OVERWRITE" = "NO" ]; then
+		UERROR "The directory $SAVEDIR exists\nTo overwrite use the -o option"
+	elif [ "$OVERWRITE" = "CHECK" ]; then
+		# check that the previous cheetah job has completed
+		if ! grep -Fxq ">-------- End of job --------<" $SAVEDIR/log.txt; then
+			UERROR "Previous job has not finished\nTo force the overwrite, use the -O option"
+		fi
+	fi
+	
+	echo "Moving to existing data directory $SAVEDIR"
+	cd $SAVEDIR
+	echo "Deleting previous $SCRIPTNAME files"
+	rm -f 	*.h5 \
+		*.cxi \
+		*.ini \
+		*.out \
+		*.log \
+		*.txt 
+	      	&> /dev/null
+	rm -rf data* &> /dev/null
+	rm -rf s* &> /dev/null
+fi
+
+# Create configuration files
+# silly, but let's expand environment variables within ini files...
+cp $INIFILE_FULL . 
+if [ "$CALIBFILE" != "None" ]; then
+  cp $CALIBFILE_FULL . 
+fi
+
+
+# toggle the number of threads here, despite value in ini file
+if [ $NTHREADS ]; then
+	echo "Will run $NTHREADS worker threads"
+	cat $INIFILE | sed -e '/nthreads/d' > tmp.ini
+	echo "nThreads=$NTHREADS" >> tmp.ini
+	mv tmp.ini $INIFILE 
+fi
+
+# keep a copy of these in the save directory, just in case they change elsewhere
+echo "Copying hdf5 files into the data directory"
+cp $(awk -F '=' '/^geometry/ {print $2}' $INIFILE) $SAVEDIR/geometry.h5 &> /dev/null
+cp $(awk -F '=' '/^darkcal/ {print $2}' $INIFILE) $SAVEDIR/darkcal.h5 &> /dev/null
+cp $(awk -F '=' '/^gaincal/ {print $2}' $INIFILE) $SAVEDIR/gaincal.h5 &> /dev/null
+cp $(awk -F '=' '/^peakmask/ {print $2}' $INIFILE) $SAVEDIR/peakmask.h5 &> /dev/null
+cp $(awk -F '=' '/^badpixelmap/ {print $2}' $INIFILE) $SAVEDIR/badpixelmap.h5 &> /dev/null
+
+# Create a status.txt file
+echo '# Cheetah status' > status.txt
+echo 'Status: Submitted' >> status.txt
+
+# Find and list XTC files 
+find $XTCDIR/${RUNDIR} -maxdepth 1 -name "*AGIPD01*.h5" > agipdfiles.txt
+[ "$(wc -l agipdfiles.txt | awk '{print $1}')" -lt 1 ] && UERROR "Found no xtc files for ${XTCDIR}/${RUNDIR}"
+
+#agipd00="find ${XTCDIR}/${RUNDIR} -maxdepth 1 -name *AGIPD00*.h5"
+agipd00files=${XTCDIR}/${RUNDIR}/*AGIPD01*.h5 
+#echo "Files found:"
+#echo $agipd00files
+
+
+# Build single threaded command
+#FULLCOMMAND="${CHEETAH} -i ${INIFILE} -c ${CALIBFILE} ${CHEETAH_OPTS} ${agipd00files}"
+
+# Build parallelised command
+FULLCOMMAND="${CONFIGDIR}/cheetahparallel.py -r ${RUNDIR} -i ${INIFILE} -c ${CALIBFILE} -j ${NTHREADS}"
+echo " "
+echo $FULLCOMMAND
+
+
+
+# Perform Slurm magic
+sbatch << EOF
+#!/bin/bash
+
+#SBATCH -p ${QUEUE}
+#SBATCH -t 10:00:00
+#SBATCH --job-name ${RUNDIR}
+$FULLCOMMAND
+EOF
+
+
+# Other SBatch commands
+##SBATCH --exclusive
+
+# make everything group editable!
+chmod -R g+rw $SAVEDIR

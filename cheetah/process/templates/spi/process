@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# for convenience
+export expt="cxi86715"
+export XTCDIR="/reg/d/psdm/cxi/${expt}/xtc"
+#export XTCDIR="/reg/d/ffb/cxi/${expt}/xtc"
+export H5DIR="/reg/d/psdm/cxi/${expt}/scratch/anton/cheetah/hdf5"
+export CONFIGDIR="/reg/d/psdm/cxi/${expt}/scratch/anton/cheetah/process"
+
+# for hitfinder
+export HITFINDER="${CONFIGDIR}/hitfinder"
+#export PSANA_CONFIG="${CONFIGDIR}/psana-spi.cfg"
+export PSANA_CONFIG="${CONFIGDIR}/psana-lite.cfg"
+#export CHEETAH="/reg/g/cfel/cheetah/cheetah-latest/bin/psana"
+export CHEETAH="/reg/neh/home1/barty/bin/psana"
+export QUEUE="psanaq"
+#export QUEUE="psfehprioq"
+
+# SLAC has an old version of the HDF5 libraries
+#export HDF5_DISABLE_VERSION_CHECK=1
+
+echo $CONFIGDIR
+
+$HITFINDER -q -O -p -t $3 -r $1 -j 12 -i $2 
+#$HITFINDER -q -c -O -p -t $3 -r $1 -j 16 -i $2 
+#$HITFINDER  -O -p -t $3 -r $1 -j 10 -i $2 
+

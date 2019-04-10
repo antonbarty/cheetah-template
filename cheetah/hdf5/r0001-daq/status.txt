@@ -1,0 +1,6 @@
+# Cheetah status
+Update time: Sat Jun  4 11:05:46 2016
+Elapsed time: 0hr 29min 4sec
+Status: Not started
+Frames processed: 0 
+Number of hits: 0

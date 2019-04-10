@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Which experiment are we processing?
+export expt="SPB/201801/p002120"
+
+# For Cheetah, XTC means input and HDF5/H5 means output
+# (This comes from LCLS history)
+export XTCDIR="/gpfs/exfel/exp/${expt}/raw"
+
+# Get the directory containing this script
+MYDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export H5DIR="$(realpath $MYDIR/../hdf5)"
+export CONFIGDIR="$MYDIR"
+
+
+# for Cheetah 
+# Assume paths are properly set to collect the correct version of Cheetah - fix paths if not
+# Also assume --rpath or LD_LIBRARY_PATH are proerly set
+which cheetah-euxfel
+export CHEETAH="cheetah-euxfel"
+export HITFINDER="${CONFIGDIR}/hitfinder"
+
+# -f : Experiment data format
+#export CHEETAH_OPTS="-f XFEL2017"
+export CHEETAH_OPTS="-f XFEL2018a"
+
+
+
+# Batch queue to use
+export QUEUE="upex"
+
+
+
+#echo "Test of input arguments:"
+#echo $1
+#echo $2
+#echo $3
+#echo $4
+
+# hitfinder script parameters:
+# -q : Use batch queue (don't run directly in terminal)
+# -O : Overwrite any previous output
+# -p : PSANA?
+# -t : Tag (suffix for output directory)
+# -r : Run number
+# -j : Number of threads
+# -i : Config file (.ini)
+# -c : Calibration file (.ini)
+
+#$HITFINDER -q -O -p -t $3 -r $1  -i $2 
+$HITFINDER -q -O -t $4 -r $1 -j 40 -i $2 -c $3
+

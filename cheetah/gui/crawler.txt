@@ -1,0 +1,2 @@
+Run,Dataset,XTC,Cheetah,CrystFEL,H5Directory,Nprocessed,Nhits,Nindex,Hitrate%,Recipe,Calibration
+1,daq,Copying,Not started,---,r0001-daq,0,0,---,---,---,---
