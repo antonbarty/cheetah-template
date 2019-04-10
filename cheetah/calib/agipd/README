@@ -1,0 +1,15 @@
+Notes on AGIPD calobration in template
+
+Data collection: 19 February 2019 by SPB team
+Processed: 21 Feb 2019 by Anton 
+
+176 memory cells acquisition pattern
+
+
+> h5ls -r Cheetah-AGIPD00-calib.h5
+/                        Group
+/AnalogOffset            Dataset {3, 176, 512, 128}
+/Badpixel                Dataset {3, 176, 512, 128}
+/DigitalGainLevel        Dataset {3, 176, 512, 128}
+/RelativeGain            Dataset {3, 176, 512, 128}
+ 

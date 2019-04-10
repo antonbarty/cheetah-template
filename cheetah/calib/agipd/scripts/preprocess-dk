@@ -1,0 +1,37 @@
+#!/bin/bash
+##
+# Script to run FS-DS calibrationsA for Cheetah calibration
+# https://github.com/AGIPD/agipd-toolbox
+#
+# For new experiments, update the input_dir to new experiment
+#
+# Once set up, call as 
+# preprocess-dk HG-run MG-run LG-run
+#
+# Step one in Cheetah calibration
+
+
+# Run list needs to be HG MG LG in that order
+echo "Will run fs-ds scripts on AGIPD dark trio"
+echo "HG: " $1
+echo "MG: " $2
+echo "LG: " $3
+echo "Using: "
+which python
+which sbatch_analyse.py
+sleep 5
+
+# Now launch the dark processing script
+# We rely on sbatch_analyse.py and python 3 being correct in the path - please fix your paths if wrong
+sbatch_analyse.py \
+--input_dir /gpfs/exfel/exp/SPB/201801/p002116/ \
+--output_dir . \
+--type dark \
+--run_list $1 $2 $3  \
+--run_type all
+
+# By default runs on the upex partition
+# To override: 
+# 	- copy xfel.yaml to current directory from agipd_toolbox/conf
+#	- edit
+# 	- add '--config ./xfel.yaml'   <--- May need the full path

@@ -1,6 +1,7 @@
 
 # Ignore any binary files (ie: HDF5 files)
 *.h5
+*.png
 
 # Upload scripts
 upload*
