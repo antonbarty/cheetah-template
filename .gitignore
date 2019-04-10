@@ -1,0 +1,24 @@
+
+# Ignore any binary files (ie: HDF5 files)
+*.h5
+
+# Upload scripts
+upload*
+download*
+
+# Patches
+patch.diff
+
+# Python files
+python/.DS_Store
+python/*pycache*
+python/*.swp
+*.o
+*.pyc
+upload
+*.so.*
+.sconsign.dblite
+source/*.xcodeproj
+build
+
+# OS X Finder
