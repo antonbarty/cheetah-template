@@ -33,11 +33,24 @@ else begin
     spawn, 'rm -rf '+outdir+'/*'
 endelse
     
+    
+    
+;; 
+;; Manual adjustment to the offset 
+;; (starting point for each gain stage)
+;;
+offset_correction = [0, 4500, 0]
 
+
+;;
+;;	Turn off 3rd gain stage?
+;;
+g3_disable = 1
 
 ;; Bit that does the processing
-quick_agipd_calib, fsds_dark_file, outdir=outdir
+quick_agipd_calib, fsds_dark_file, outdir=outdir, g3_disable=g3_disable, offset_correction=offset_correction
 
 
 
 end
+ 

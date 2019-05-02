@@ -111,6 +111,49 @@ function process_offset, manuela_dark
 end
 
 
+;;
+;;	Adjust the offsets if needed
+;; 	This will change the zero intercept of each of the gain stages, improving the
+;;	transition between gain stages when using calibration with only dark files
+;;
+
+function adjust_offset, offset_in, gain, offset_correction
+	print,'Adusting offsets: '
+	print,'offset_correction = ', offset_correction
+	
+	if n_elements(offset_correction) eq 1 then begin
+		offset_correction = replicate(offset_correction, 3)
+	end
+	
+	if n_elements(offset_correction) ne 3 then begin
+		print,'Fault: offset correction array of a confusing size (skipping)'
+		return, offset_in
+	end
+	
+	s = size(offset_in, /dim)
+	nfs = s[0]
+	nss = s[1]
+	ncell = s[2]
+	ngain = s[3]
+
+	offset_out = offset_in
+		
+
+	for c = 0, ncell-1 do begin
+		for g=0, ngain-1 do begin
+		
+			gmean = median(gain[*,*,c,g])
+			offset_shift = (offset_correction[g]/gmean)				
+			offset_out[*,*,c,g] = offset_in[*,*,c,g] - offset_shift
+		endfor
+		print, c, ' : ', median(offset_in[*,*,c,0]), median(offset_in[*,*,c,1]), median(offset_in[*,*,c,2]), ' --> ', $
+			median(offset_out[*,*,c,0]), median(offset_out[*,*,c,1]), median(offset_out[*,*,c,2])
+	endfor
+
+	return, offset_out
+end
+
+
 
 
 ;; 
@@ -313,10 +356,13 @@ end
 ;;	Need to take the low-side of the curve, not the median.
 ;;	Midpoint of two distributions probably the best for G1/G2 threshold
 ;;
-function process_thresh, dark_thresh, g3=g3
+function process_thresh, dark_thresh, g3_disable=g3_disable
 	print,'Processing gain threshold:'
+	if keyword_set(g3_disable) then begin
+		print, "Disabling 3rd gain stage"
+	endif
+	
 	s = size(dark_thresh, /dim)
-
 	s_out = s
 	s_out[3] = 3
 	out = fltarr(s_out)
@@ -363,10 +409,12 @@ function process_thresh, dark_thresh, g3=g3
 		
 	endfor
 	
-	;; Set 3rd gain stage to off?
-	if keyword_set(g3) then begin
+	
+	;; Diable 3rd gain stage by setting the threshold value to a ridiculous value
+	if keyword_set(g3_disable) then begin
 		out[*,*,*,2] = 32000
 	endif
+	
 	
 	return, out
 end
@@ -811,7 +859,8 @@ end
 ;;
 ;; Code to process one module
 ;;
-pro process_module, manuela_dark_file, file_format, module_name, g3=g3, outdir=outdir
+pro process_module, manuela_dark_file, file_format, module_name, outdir=outdir, $
+						g3_disable=g3_disable, offset_correction=offset_correction
 			
 
 	;;
@@ -901,16 +950,22 @@ pro process_module, manuela_dark_file, file_format, module_name, g3=g3, outdir=o
 	offset_out = process_offset(m_dark_offset)
 	offset_out = fix(offset_out)
 
-
 	;; Gains will be the median of module for that memory cell
 	gain_out = set_nominal_gain(m_dark_offset)
 	gain_out = float(gain_out)
 
 
-
 	;; Gain thresholds from Manuela
-	thresh_out = process_thresh(m_dark_thresh, g3=g3)
+	thresh_out = process_thresh(m_dark_thresh, g3_disable=g3_disable)
 	thresh_out = fix(thresh_out)
+
+
+	;; Manual adjustment to offsets 
+	;; (Note: must be done after gains are set)
+	if keyword_set(offset_correction) then begin
+		offset_out = adjust_offset(offset_out, gain_out, offset_correction)
+		offset_out = fix(offset_out)
+	endif
 
 
 	;; Interesting gain threshold plots
@@ -918,12 +973,14 @@ pro process_module, manuela_dark_file, file_format, module_name, g3=g3, outdir=o
 	;plot_thresh_creep, m_dark_gainlevel_mean, 'GainLevelMean'
 
 
-	;; Bad pixels !!
+	;; Bad pixels map - very important !!
 	badpix_out1 = process_badpix_offs(offset_out)
 	badpix_out3 = process_badpix_gthresh(m_dark_gainlevel_mean, m_dark_thresh)
 	badpix_out = badpix_out1 OR badpix_out3
 	badpix_out = suppress_dodgy_asics(badpix_out)
 	badpix_out = byte(badpix_out)
+	
+	
 	
 	
 
@@ -1018,12 +1075,12 @@ end
 
 ;;
 ;;	Process all modules
+;; 	Changes in file naming and HDF5 field conventions are all done one up from this layer
 ;;	From here on in changes should only occur with changes in file format
-;; 	Changes in file name are all done one up from this layer
 ;;
 
 pro quick_agipd_calib, manuela_dark_file, $
-				test=test, g3=g3, outdir=outdir
+				test=test, outdir=outdir, g3_disable=g3_disable, offset_correction=offset_correction
 
 	
 	;; Names of modules to process
@@ -1067,6 +1124,15 @@ pro quick_agipd_calib, manuela_dark_file, $
 		return
 	endif
 
+
+	if keyword_set(offset_correction) then begin
+		print, "Offset correction: ", offset_correction
+	endif
+	
+	if keyword_set(g3_disable) then begin
+		print,'Disabling 3rd gain stage'
+	endif
+
 	print, '(OK)'
 	
 
@@ -1076,7 +1142,8 @@ pro quick_agipd_calib, manuela_dark_file, $
 	;; Loop through all modules
 	for i=0, n_elements(modules_to_process)-1 do begin
 	
-		process_module, manuela_dark_file, file_format, modules_to_process[i], g3=1, outdir=outdir
+		process_module, manuela_dark_file, file_format, modules_to_process[i], outdir=outdir, $
+			g3_disable=g3_disable, offset_correction=offset_correction
 		
 		if keyword_set(test) then $
 			stop
