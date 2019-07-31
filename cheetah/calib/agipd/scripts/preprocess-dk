@@ -24,8 +24,9 @@ sleep 5
 # Now launch the dark processing script
 # We rely on sbatch_analyse.py and python 3 being correct in the path - please fix your paths if wrong
 sbatch_analyse.py \
---input_dir /gpfs/exfel/exp/SPB/201801/p002116/ \
+--input_dir /gpfs/exfel/exp/SPB/201901/p002480/ \
 --output_dir . \
+--detector_string SPB_DET_AGIPD1M-1 \
 --type dark \
 --run_list $1 $2 $3  \
 --run_type all

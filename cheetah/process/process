@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Which experiment are we processing?
-export expt="SPB/201801/p002120"
+export expt=SPB/201901/p002480
 
 # For Cheetah, XTC means input and HDF5/H5 means output
 # (This comes from LCLS history)
@@ -22,7 +22,7 @@ export HITFINDER="${CONFIGDIR}/hitfinder"
 
 # -f : Experiment data format
 #export CHEETAH_OPTS="-f XFEL2017"
-export CHEETAH_OPTS="-f XFEL2018a"
+export CHEETAH_OPTS="-f XFEL2019"
 
 
 
