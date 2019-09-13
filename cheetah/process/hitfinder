@@ -224,8 +224,9 @@ sbatch << EOF
 #!/bin/bash
 
 #SBATCH -p ${QUEUE}
-#SBATCH -t 10:00:00
+#SBATCH -t 24:00:00
 #SBATCH --job-name ${RUNDIR}
+#SBATCH --overcommit
 $FULLCOMMAND
 EOF
 
